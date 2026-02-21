@@ -1,16 +1,14 @@
-# page_2.py
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import streamlit as st
+import altair as alt
 
 
 def _resolve_data_dir() -> Path:
     local = Path("data")
-    if local.exists():
-        return local
-    return Path("/mnt/data")
+    return local if local.exists() else Path("/mnt/data")
 
 
 DATA_DIR = _resolve_data_dir()
@@ -26,34 +24,35 @@ def read_csv(name: str) -> pd.DataFrame:
 
 def render():
     st.title("📈 Orders & Revenue Over Time")
-    st.caption("Monthly trend using orders + order_items (revenue = sum of item prices)")
+    st.caption("Interactive small-multiples: brush to zoom, hover for precise values.")
 
     with st.sidebar:
-        st.subheader("Page 2 controls")
+        st.subheader("Controls")
         gran = st.selectbox("Time granularity", ["Monthly", "Weekly"], index=0)
-        show_points = st.checkbox("Show markers", value=True)
+        show_points = st.checkbox("Show points", value=False)
+        smooth = st.checkbox("Rolling average", value=True)
+        window = st.slider("Rolling window (periods)", 2, 16, 4, 1) if smooth else 0
+        log_revenue = st.checkbox("Log revenue (log1p)", value=False)
+        reset_zoom = st.checkbox("Reset zoom", value=False)
 
     orders = read_csv("olist_orders_dataset.csv")
     items = read_csv("olist_order_items_dataset.csv")
 
-    # Parse timestamps
     orders["order_purchase_timestamp"] = pd.to_datetime(
         orders["order_purchase_timestamp"], errors="coerce"
     )
     items["price"] = pd.to_numeric(items["price"], errors="coerce")
 
     df = orders.merge(items[["order_id", "price"]], on="order_id", how="left")
-
     df = df.dropna(subset=["order_purchase_timestamp"])
     df["price"] = df["price"].fillna(0.0)
 
     if gran == "Monthly":
         df["period"] = df["order_purchase_timestamp"].dt.to_period("M").dt.to_timestamp()
-        title = "Monthly Orders Count & Revenue"
+        title = "Monthly Trend"
     else:
-        # Week starts Monday by default; this makes nice regular bins
         df["period"] = df["order_purchase_timestamp"].dt.to_period("W").dt.start_time
-        title = "Weekly Orders Count & Revenue"
+        title = "Weekly Trend"
 
     agg = (
         df.groupby("period")
@@ -65,46 +64,136 @@ def render():
         .reset_index()
     )
 
-    fig = plt.figure(figsize=(16, 7))
-    ax1 = fig.add_subplot(111)
+    if len(agg) == 0:
+        st.info("No data available after cleaning timestamps.")
+        return
 
-    ax1.set_title(title, fontsize=16, pad=10)
-    ax1.plot(
-        agg["period"],
-        agg["orders"],
-        linestyle="-",
-        marker="o" if show_points else None,
-        linewidth=2,
-        label="Orders (unique order_id)",
+    if log_revenue:
+        agg["revenue_plot"] = np.log1p(agg["revenue"])
+        revenue_title = "Revenue (log1p)"
+    else:
+        agg["revenue_plot"] = agg["revenue"]
+        revenue_title = "Revenue"
+
+    if smooth and window and len(agg) >= window:
+        agg["orders_smooth"] = agg["orders"].rolling(window).mean()
+        agg["revenue_smooth"] = agg["revenue_plot"].rolling(window).mean()
+    else:
+        agg["orders_smooth"] = np.nan
+        agg["revenue_smooth"] = np.nan
+
+    # ---- Summary metrics (context without clutter)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total orders", f"{int(agg['orders'].sum()):,}")
+    c2.metric("Total revenue", f"{float(agg['revenue'].sum()):,.2f}")
+    c3.metric("Date range", f"{agg['period'].min().date()} → {agg['period'].max().date()}")
+
+    st.divider()
+    st.subheader(title)
+
+    # ---- Interactive selections
+    hover = alt.selection_point(
+        fields=["period"],
+        nearest=True,
+        on="mouseover",
+        empty=False,
+        clear="mouseout",
     )
-    ax1.set_xlabel("Period")
-    ax1.set_ylabel("Orders")
-    ax1.grid(axis="y", linestyle="--", alpha=0.35)
 
-    ax2 = ax1.twinx()
-    ax2.plot(
-        agg["period"],
-        agg["revenue"],
-        linestyle="--",
-        marker="o" if show_points else None,
-        linewidth=2,
-        color="green",
-        label="Revenue (sum of item price)",
+    brush = alt.selection_interval(encodings=["x"])
+    if reset_zoom:
+        brush = alt.selection_interval(encodings=["x"], empty="all")
+
+    base = alt.Chart(agg).encode(
+        x=alt.X("period:T", title=None),
     )
-    ax2.set_ylabel("Revenue")
 
-    # Combined legend
-    h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax2.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc="upper left", frameon=True)
+    # Use brush as a filter for the main charts (zoom)
+    filtered = base.transform_filter(brush)
 
-    st.pyplot(fig, clear_figure=True)
+    # Tooltip content: always show original revenue (not log) for interpretability
+    tooltip = [
+        alt.Tooltip("period:T", title="Period"),
+        alt.Tooltip("orders:Q", title="Orders", format=","),
+        alt.Tooltip("revenue:Q", title="Revenue", format=",.2f"),
+    ]
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.metric("Total orders", f"{int(agg['orders'].sum()):,}")
-    with c2:
-        st.metric("Total revenue (items price)", f"{float(agg['revenue'].sum()):,.2f}")
+    line_kwargs = {"strokeWidth": 2}
+
+    # ---- Orders chart
+    orders_line = filtered.mark_line(**line_kwargs).encode(
+        y=alt.Y("orders:Q", title="Orders", axis=alt.Axis(grid=True)),
+        tooltip=tooltip,
+    )
+
+    orders_smooth = filtered.mark_line(opacity=0.5, strokeDash=[4, 3]).encode(
+        y=alt.Y("orders_smooth:Q", title=None),
+    )
+
+    orders_points = filtered.mark_circle(size=35).encode(
+        y="orders:Q",
+        opacity=alt.condition(hover, alt.value(1.0), alt.value(0.0)),
+        tooltip=tooltip,
+    ).add_params(hover)
+
+    orders_rule = filtered.mark_rule(opacity=0.25).encode(
+        x="period:T"
+    ).transform_filter(hover)
+
+    orders_layer = orders_line
+    if smooth and window:
+        orders_layer = orders_layer + orders_smooth
+    if show_points:
+        orders_layer = orders_layer + orders_points + orders_rule
+
+    orders_chart = orders_layer.properties(height=260)
+
+    # ---- Revenue chart
+    revenue_line = filtered.mark_line(**line_kwargs).encode(
+        y=alt.Y("revenue_plot:Q", title=revenue_title, axis=alt.Axis(grid=True)),
+        tooltip=tooltip,
+    )
+
+    revenue_smooth = filtered.mark_line(opacity=0.5, strokeDash=[4, 3]).encode(
+        y=alt.Y("revenue_smooth:Q", title=None),
+    )
+
+    revenue_points = filtered.mark_circle(size=35).encode(
+        y="revenue_plot:Q",
+        opacity=alt.condition(hover, alt.value(1.0), alt.value(0.0)),
+        tooltip=tooltip,
+    ).add_params(hover)
+
+    revenue_rule = filtered.mark_rule(opacity=0.25).encode(
+        x="period:T"
+    ).transform_filter(hover)
+
+    revenue_layer = revenue_line
+    if smooth and window:
+        revenue_layer = revenue_layer + revenue_smooth
+    if show_points:
+        revenue_layer = revenue_layer + revenue_points + revenue_rule
+
+    revenue_chart = revenue_layer.properties(height=260)
+
+    # ---- Overview brush (mini timeline)
+    overview = (
+        base.mark_area(opacity=0.25)
+        .encode(
+            y=alt.Y("orders:Q", title=None, axis=alt.Axis(labels=False, ticks=False, grid=False)),
+        )
+        .properties(height=70)
+        .add_params(brush)
+    )
+
+    final = alt.vconcat(
+        orders_chart,
+        revenue_chart,
+        overview,
+        spacing=18,
+    ).resolve_scale(x="shared")
+
+    st.altair_chart(final, use_container_width=True)
 
     with st.expander("Show aggregated table"):
         st.dataframe(agg, use_container_width=True)

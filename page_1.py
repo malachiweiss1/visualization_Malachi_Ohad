@@ -1,21 +1,13 @@
-# page_1.py
 from pathlib import Path
 
 import pandas as pd
-import matplotlib.pyplot as plt
 import streamlit as st
+import altair as alt
 
 
 def _resolve_data_dir() -> Path:
-    """
-    Prefer local project folder ./data (as user requested).
-    Fallback to /mnt/data (useful in notebooks / this sandbox).
-    """
     local = Path("data")
-    if local.exists():
-        return local
-    fallback = Path("/mnt/data")
-    return fallback
+    return local if local.exists() else Path("/mnt/data")
 
 
 DATA_DIR = _resolve_data_dir()
@@ -29,18 +21,24 @@ def read_csv(name: str) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
+def _format_money(x: float) -> str:
+    return f"{x:,.2f}"
+
+
 def render():
-    st.title("📦 Top Product Categories — Revenue & Avg Price")
-    st.caption("Bars: revenue (sum of item price) | Line: average item price | Bar labels: % of total revenue")
+    st.title("📦 Product Categories — Revenue, Pricing, and Concentration")
+    st.caption("Interactive category-level analysis (revenue = sum of item prices).")
 
     with st.sidebar:
-        st.subheader("Page 1 controls")
-        top_n = st.slider("Top N categories", min_value=5, max_value=30, value=12, step=1)
+        st.subheader("Controls")
+        top_n = st.slider("Top N categories", 5, 40, 12, 1)
+        sort_by = st.selectbox("Sort categories by", ["Revenue", "Average price"], index=0)
+        trim_outliers = st.checkbox("Trim extreme prices (1%–99%)", value=True)
+        show_table = st.checkbox("Show aggregated table", value=False)
 
     items = read_csv("olist_order_items_dataset.csv")
     products = read_csv("olist_products_dataset.csv")
 
-    # Optional translation
     translation_path = DATA_DIR / "product_category_name_translation.csv"
     if translation_path.exists():
         trans = pd.read_csv(translation_path)
@@ -54,127 +52,116 @@ def render():
 
     df = items.merge(products[["product_id", cat_col]], on="product_id", how="left")
     df[cat_col] = df[cat_col].fillna("unknown")
+    df = df.dropna(subset=["price"])
 
-    total_revenue_all = df["price"].dropna().sum()
+    total_revenue_all = float(df["price"].sum()) if len(df) else 0.0
+
+    if trim_outliers and len(df):
+        lo, hi = df["price"].quantile([0.01, 0.99]).tolist()
+        df = df[(df["price"] >= lo) & (df["price"] <= hi)]
 
     stats = (
-        df.dropna(subset=["price"])
-        .groupby(cat_col)
-        .agg(revenue=("price", "sum"), avg_price=("price", "mean"))
-        .sort_values("revenue", ascending=False)
-        .head(top_n)
+        df.groupby(cat_col)
+        .agg(
+            revenue=("price", "sum"),
+            avg_price=("price", "mean"),
+            items=("price", "size"),
+        )
+        .reset_index()
     )
 
-    top_revenue = float(stats["revenue"].sum()) if not stats.empty else 0.0
-    rest_revenue = max(float(total_revenue_all) - top_revenue, 0.0)
-    top_share_of_total = (top_revenue / float(total_revenue_all) * 100.0) if total_revenue_all else 0.0
-
-    if total_revenue_all:
-        stats["revenue_pct_of_total"] = stats["revenue"] / float(total_revenue_all) * 100.0
+    if sort_by == "Revenue":
+        stats = stats.sort_values("revenue", ascending=False)
     else:
-        stats["revenue_pct_of_total"] = 0.0
+        stats = stats.sort_values("avg_price", ascending=False)
 
-    # ---- Figure Layout: Left bar+line, Right pie
-    fig = plt.figure(figsize=(18, 9))
-    gs = fig.add_gridspec(nrows=1, ncols=2, width_ratios=[3.4, 1.4], wspace=0.25)
-
-    ax1 = fig.add_subplot(gs[0, 0])
-    ax_pie = fig.add_subplot(gs[0, 1])
-
-    # Left: bars
-    bars = ax1.bar(
-        stats.index.astype(str),
-        stats["revenue"],
-        alpha=0.88,
-        label="Revenue (sum of item price)",
+    stats_top = stats.head(top_n).copy()
+    stats_top["revenue_pct_of_total"] = (
+        (stats_top["revenue"] / total_revenue_all * 100.0) if total_revenue_all else 0.0
     )
-    ax1.set_title(
-        f"Top Product Categories — Revenue & Avg Price\n(Bar labels = % of TOTAL revenue)",
-        fontsize=16,
-        pad=14,
-    )
-    ax1.set_xlabel("Product Category", fontsize=12)
-    ax1.set_ylabel("Revenue", fontsize=12)
-    ax1.tick_params(axis="x", rotation=35)
-    ax1.grid(axis="y", linestyle="--", alpha=0.35)
 
-    for bar, pct in zip(bars, stats["revenue_pct_of_total"].tolist()):
-        ax1.annotate(
-            f"{pct:.1f}%",
-            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
-            xytext=(0, 6),
-            textcoords="offset points",
-            ha="center",
-            va="bottom",
-            fontsize=9,
-            alpha=0.95,
+    top_revenue = float(stats_top["revenue"].sum()) if len(stats_top) else 0.0
+    rest_revenue = max(total_revenue_all - top_revenue, 0.0)
+    top_share = (top_revenue / total_revenue_all * 100.0) if total_revenue_all else 0.0
+
+    # ---- Metrics row (academic-style summary)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total revenue", _format_money(total_revenue_all))
+    c2.metric(f"Top-{top_n} revenue", _format_money(top_revenue))
+    c3.metric(f"Top-{top_n} share", f"{top_share:.1f}%")
+    c4.metric("Categories (unique)", f"{stats[cat_col].nunique():,}")
+
+    st.divider()
+
+    # ---- Left: interactive bar chart for revenue
+    base = alt.Chart(stats_top).encode(
+        x=alt.X(f"{cat_col}:N", sort="-y", title="Category"),
+        tooltip=[
+            alt.Tooltip(f"{cat_col}:N", title="Category"),
+            alt.Tooltip("revenue:Q", title="Revenue", format=",.2f"),
+            alt.Tooltip("avg_price:Q", title="Avg price", format=",.2f"),
+            alt.Tooltip("items:Q", title="Items", format=","),
+            alt.Tooltip("revenue_pct_of_total:Q", title="% of total", format=".1f"),
+        ],
+    )
+
+    bar = base.mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
+        y=alt.Y("revenue:Q", title="Revenue"),
+    )
+
+    label = base.mark_text(align="center", dy=-8, fontSize=11).encode(
+        y=alt.Y("revenue:Q"),
+        text=alt.Text("revenue_pct_of_total:Q", format=".1f"),
+    )
+
+    revenue_chart = (bar + label).properties(height=420).interactive()
+
+    # ---- Right: concentration chart (Top-N vs Rest)
+    share_df = pd.DataFrame(
+        {
+            "group": [f"Top {top_n}", "All other categories"],
+            "revenue": [top_revenue, rest_revenue],
+        }
+    )
+
+    share_chart = (
+        alt.Chart(share_df)
+        .mark_bar(cornerRadius=10)
+        .encode(
+            y=alt.Y("group:N", title=None, sort=["All other categories", f"Top {top_n}"]),
+            x=alt.X("revenue:Q", title="Revenue"),
+            tooltip=[
+                alt.Tooltip("group:N", title="Group"),
+                alt.Tooltip("revenue:Q", title="Revenue", format=",.2f"),
+            ],
+        )
+        .properties(height=180)
+    )
+
+    # ---- Layout
+    left, right = st.columns([3.2, 1.3], vertical_alignment="top")
+    with left:
+        st.subheader("Top categories (interactive)")
+        st.altair_chart(revenue_chart, use_container_width=True)
+
+    with right:
+        st.subheader("Concentration")
+        st.altair_chart(share_chart, use_container_width=True)
+
+        st.caption("Interpretation: revenue concentration shows whether a few categories dominate sales.")
+
+        # Download aggregated top table
+        csv_bytes = stats_top.rename(columns={cat_col: "category"}).to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download Top-N aggregation (CSV)",
+            data=csv_bytes,
+            file_name=f"page1_top_{top_n}_categories.csv",
+            mime="text/csv",
+            use_container_width=True,
         )
 
-    # Secondary axis: avg price line
-    ax2 = ax1.twinx()
-    ax2.plot(
-        stats.index.astype(str),
-        stats["avg_price"],
-        marker="o",
-        linestyle="--",
-        linewidth=2,
-        color="green",
-        label="Average Item Price",
-    )
-    ax2.set_ylabel("Average Item Price", fontsize=12)
-
-    # Legend: move outside so it doesn't cover right ticks
-    h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax2.get_legend_handles_labels()
-    leg = ax1.legend(
-        h1 + h2,
-        l1 + l2,
-        loc="upper left",
-        bbox_to_anchor=(1.18, 1.00),
-        borderaxespad=0.0,
-        frameon=True,
-        title="Info",
-    )
-    leg.get_title().set_fontsize(11)
-
-    # Right: pie topN vs rest
-    ax_pie.set_title("Share of Total Revenue", fontsize=13, pad=10)
-    pie_vals = [top_revenue, rest_revenue]
-    pie_labels = [f"Top {top_n}", "All other categories"]
-
-    ax_pie.pie(
-        pie_vals,
-        labels=pie_labels,
-        autopct=lambda p: f"{p:.1f}%",
-        startangle=90,
-        pctdistance=0.75,
-        labeldistance=1.08,
-        textprops={"fontsize": 10},
-        wedgeprops={"linewidth": 1, "edgecolor": "white"},
-    )
-    ax_pie.axis("equal")
-
-    # Summary panel
-    def fmt_money(x: float) -> str:
-        return f"{x:,.2f}"
-
-    summary_lines = [
-        f"Top-{top_n} revenue:  {fmt_money(top_revenue)}",
-        f"Total revenue:       {fmt_money(float(total_revenue_all))}",
-        f"Top-{top_n} share:     {top_share_of_total:.1f}%",
-    ]
-    fig.text(
-        0.02,
-        0.98,
-        "\n".join(summary_lines),
-        ha="left",
-        va="top",
-        fontsize=12,
-        family="monospace",
-        bbox=dict(boxstyle="round,pad=0.5", facecolor="#F6F6F6", edgecolor="#D0D0D0"),
-    )
-
-    st.pyplot(fig, clear_figure=True)
-
-    with st.expander("Show aggregated table (Top categories)"):
-        st.dataframe(stats.reset_index().rename(columns={cat_col: "category"}), use_container_width=True)
+    if show_table:
+        with st.expander("Aggregated table (Top categories)", expanded=True):
+            out = stats_top.rename(columns={cat_col: "category"}).copy()
+            out["revenue_pct_of_total"] = out["revenue_pct_of_total"].round(2)
+            st.dataframe(out, use_container_width=True)
