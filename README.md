@@ -23,9 +23,7 @@ Key Features
 Project Structure
 -----------------
 main.py        – Streamlit entry point and navigation
-page_1.py      – Product category revenue & pricing analysis
-page_2.py      – Orders and revenue over time
-page_3–6.py    – Reserved for future extensions
+page_1–7.py    – visualizatuions
 data/          – Olist CSV datasets
 
 
