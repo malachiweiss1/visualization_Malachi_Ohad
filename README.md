@@ -1,73 +1,275 @@
-Olist E-Commerce Data Visualization Dashboard
-=============================================
+📊 דוח מסכם – ויזואליזציה של המידע
+Olist E-Commerce Platform
 
-This project is a Streamlit-based interactive dashboard built on the Olist
-Brazilian E-Commerce dataset. It focuses on exploratory data analysis and
-visualization of product categories, revenue concentration, pricing behavior,
-and temporal trends.
+קורס: ויזואליזציה של המידע
+מרצה: פרופ׳ גלעד רביד
 
-The project was developed as part of an academic data visualization assignment
-and emphasizes clarity, interpretability, and clean analytical structure.
+מגישים:
 
+אוהד אשכנזי
 
-Key Features
-------------
-• Multi-page Streamlit application
-• Top-N product category analysis by revenue
-• Average item price per category
-• Revenue share of top categories vs all others
-• Orders and revenue trends over time (monthly / weekly)
-• Clear separation between data loading, aggregation, and visualization
+מלאכי ויס
 
+📂 תיאור הנתונים ואופן הטיפול
 
-Project Structure
------------------
-main.py        – Streamlit entry point and navigation
-page_1–7.py    – visualizatuions
-data/          – Olist CSV datasets
+הפרויקט מבוסס על מאגר הנתונים הציבורי של פלטפורמת האיקומרס הברזילאית Olist, הכולל מידע על:
 
+הזמנות
 
-Dashboard Pages
----------------
-Page 1:
-Top product categories by total revenue with:
-• Bar chart (revenue)
-• Line chart (average price)
-• Pie chart (revenue share)
+פריטים
 
-Page 2:
-Orders and revenue trends over time using dual-axis line charts
+קטגוריות מוצרים
 
+מוכרים
 
-Dataset
--------
-Olist Brazilian E-Commerce Public Dataset
-Includes orders, order items, products, categories, and timestamps.
-Category names are optionally translated to English.
+משלוחים
 
+חותמות זמן
 
-Installation & Run
-------------------
-1. Clone repository:
-   git clone https://github.com/malachiweiss1/visualization_Malachi_Ohad.git
+מידע גיאוגרפי
 
-2. Install dependencies:
-   pip install -r requirements.txt
+הנתונים בנויים כמערכת טבלאות רלציוניות המחוברות באמצעות מזהים ייחודיים (Order ID, Seller ID וכו').
 
-3. Run the app:
-   streamlit run main.py
+שלבי עיבוד מרכזיים
 
+מיזוג טבלאות (Join) ליצירת טבלאות אנליטיות
 
-Design Goals
-------------
-• Visual clarity over complexity
-• Interpretable business insights
-• Scalable structure for future analysis
-• Academic-quality presentation
+ניקוי ערכים חסרים וחריגים
 
+תיקון טיפוסי נתונים (בעיקר תאריכים ושעות)
 
-Author
-------
-Malachi Weiss
-Ohad Ashkenazi
-M.Sc. Data Science – Visualization Course Project
+אגרגציה לפי שבוע / חודש / רבעון
+
+חישוב מדדים נגזרים:
+
+סך הכנסות
+
+מחיר ממוצע לפריט
+
+שיעור איחורים
+
+אחוז צמיחה
+
+מדדי ריכוזיות (Top-N)
+
+מתאם בין משתנים
+
+במקרים של חריגים בוצע Trim סטטיסטי באחוזונים 1%-99%.
+
+📊 ויזואליזציה ראשונה
+Pareto – ריכוזיות הכנסות לפי קטגוריה
+<p align="center"> <img src="images/viz1.png" width="900"> </p>
+What
+
+נתונים אגרגטיביים ברמת קטגוריית מוצר:
+
+סך הכנסות
+
+מחיר ממוצע
+
+מספר פריטים
+
+אחוז מההכנסה הכוללת
+
+Why
+
+זיהוי ריכוזיות הכנסות ובחינת עקרון Pareto (80/20).
+
+How
+
+עמודות מייצגות הכנסות
+
+קו מצטבר מייצג אחוז ריכוזיות
+
+אפשרות שליטה ב-Top-N
+
+סינון ערכים חריגים
+
+שאלה עסקית
+
+האם ההכנסות מפוזרות על פני קטגוריות רבות, או נשענות על מספר מצומצם של קטגוריות דומיננטיות?
+
+📈 ויזואליזציה שנייה
+Orders & Revenue Over Time – Small Multiples אינטראקטיבי
+<p align="center"> <img src="images/viz2.png" width="900"> </p>
+What
+
+נתוני סדרת זמן (שבועי / חודשי):
+
+מספר הזמנות ייחודיות
+
+סך הכנסות
+
+Why
+
+זיהוי מגמות צמיחה, האטה, עונתיות ושינוי מבני בפלטפורמה.
+
+How
+
+שני תרשימי קו נפרדים (Small Multiples)
+
+ציר זמן משותף
+
+Brush לזום דינמי
+
+Hover להצגת ערכים מדויקים
+
+Rolling Average להחלקת תנודתיות
+
+אפשרות סקאלה לוגריתמית
+
+שאלה עסקית
+
+כיצד מתפתחות ההזמנות וההכנסות לאורך זמן?
+האם קיימת סינכרוניזציה בין נפח הפעילות לביצוע הפיננסי?
+
+📦 ויזואליזציה שלישית
+Shipping Performance
+<p align="center"> <img src="images/viz3.png" width="900"> </p>
+What
+
+נפח הזמנות
+
+סטטוס משלוח
+
+אחוז איחורים
+
+Why
+
+בדיקה האם גידול בפעילות משפיע על איכות השירות הלוגיסטי.
+
+How
+
+עמודות לנפח פעילות
+
+קו לשיעור איחורים
+
+פילטור רזולוציית זמן
+
+שאלה עסקית
+
+האם צמיחה בנפח ההזמנות פוגעת באיכות השילוח?
+
+🔥 ויזואליזציה רביעית
+Heatmap – דפוסי ביקוש לפי שעה ויום
+<p align="center"> <img src="images/viz4.png" width="900"> </p>
+What
+
+יום בשבוע
+
+שעה ביממה
+
+כמות הזמנות
+
+Why
+
+זיהוי דפוסים מחזוריים ועומסי שיא.
+
+How
+
+מטריצה דו־ממדית
+
+רוויה צבעונית לעוצמת ביקוש
+
+שאלה עסקית
+
+מתי מתרחש שיא הביקוש לצורך תכנון משאבים?
+
+🗺 ויזואליזציה חמישית
+Proportional Symbol Map – פעילות גיאוגרפית
+<p align="center"> <img src="images/viz5.png" width="900"> </p>
+What
+
+קואורדינטות גיאוגרפיות
+
+הכנסות
+
+נפח הזמנות
+
+Why
+
+איתור ריכוזי פעילות ומוכרים דומיננטיים לפי אזור.
+
+How
+
+גודל בועה = מדד כמותי
+
+סינון אזורים וטווחי זמן
+
+שאלה עסקית
+
+מיהם השחקנים הדומיננטיים בכל אזור גיאוגרפי?
+
+📉 ויזואליזציה שישית
+Scatterplot – מספר מוכרים מול הכנסות
+<p align="center"> <img src="images/viz6.png" width="900"> </p>
+What
+
+מספר מוכרים פעילים
+
+סך הכנסות
+
+נפח הזמנות
+
+Why
+
+בדיקת קיום אפקט רשת חיובי.
+
+How
+
+תרשים פיזור
+
+גודל נקודה = נפח הזמנות
+
+קו מגמה
+
+שאלה עסקית
+
+האם הגדלת מספר המוכרים מובילה לעלייה בהכנסות?
+
+🔵 ויזואליזציה שביעית
+Bubble Chart – ניתוח צמיחה לפי קטגוריה
+<p align="center"> <img src="images/viz7.png" width="900"> </p>
+What
+
+אחוז צמיחה
+
+סך הכנסות
+
+נפח הזמנות
+
+מחיר ממוצע
+
+Why
+
+זיהוי מנועי צמיחה לעומת קטגוריות בסיכון.
+
+How
+
+X = צמיחה
+
+Y = הכנסות
+
+גודל = נפח פעילות
+
+צבע = מחיר ממוצע
+
+קו ייחוס לצמיחה אפסית
+
+שאלה עסקית
+
+אילו קטגוריות הן מנועי הצמיחה העתידיים של הפלטפורמה?
+
+🎨 עקרונות עיצוב שיושמו
+
+Small Multiples במקום ציר כפול
+
+Overview → Zoom → Details on Demand
+
+Data-Ink Ratio
+
+Semantic Color Usage
+
+אינטראקטיביות תומכת החלטה
+
+הפרדה בין הקשר כללי לבין פירוט נקודתי
