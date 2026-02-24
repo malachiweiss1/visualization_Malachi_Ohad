@@ -16,19 +16,19 @@
 הפרויקט מבוסס על מאגר הנתונים הציבורי של פלטפורמת האיקומרס הברזילאית
 **Olist**, הכולל מידע רב־ממדי על:
 
--   הזמנות\
--   פריטים\
--   קטגוריות מוצרים\
--   מוכרים\
--   משלוחים\
--   חותמות זמן\
+-   הזמנות
+-   פריטים
+-   קטגוריות מוצרים
+-   מוכרים
+-   משלוחים
+-   חותמות זמן
 -   מידע גיאוגרפי
 
 שלבי עיבוד מרכזיים:
 
--   מיזוג טבלאות (Join)\
--   ניקוי ערכים חסרים וחריגים\
--   אגרגציה לפי שבוע / חודש\
+-   מיזוג טבלאות (Join)
+-   ניקוי ערכים חסרים וחריגים
+-   אגרגציה לפי שבוע / חודש
 -   חישוב מדדים נגזרים (Revenue, Growth, Delay Rate וכו')
 
 ------------------------------------------------------------------------
@@ -37,13 +37,8 @@
 
 ## Pareto -- ריכוזיות הכנסות לפי קטגוריה
 
-```{=html}
-<p align="center">
-```
-`<img src="images/viz1.png" width="900">`{=html}
-```{=html}
-</p>
-```
+<p align="center"> <img src="images/viz1.png" width="900"> </p>
+
 ### שאלה עסקית
 
 האם ההכנסות נשענות על מספר מצומצם של קטגוריות?
@@ -54,12 +49,7 @@
 
 ## Orders & Revenue Over Time -- Small Multiples
 
-```{=html}
-<p align="center">
-```
-`<img src="images/viz2.png" width="900">`{=html}
-```{=html}
-</p>
+<p align="center"> <img src="images/viz2.png" width="900"> </p>
 ```
 ### שאלה עסקית
 
@@ -71,13 +61,7 @@
 
 ## Shipping Performance
 
-```{=html}
-<p align="center">
-```
-`<img src="images/viz3.png" width="900">`{=html}
-```{=html}
-</p>
-```
+<p align="center"> <img src="images/viz3.png" width="900"> </p>
 
 ------------------------------------------------------------------------
 
@@ -85,13 +69,7 @@
 
 ## Heatmap
 
-```{=html}
-<p align="center">
-```
-`<img src="images/viz4.png" width="900">`{=html}
-```{=html}
-</p>
-```
+<p align="center"> <img src="images/viz4.png" width="900"> </p>
 
 ------------------------------------------------------------------------
 
@@ -99,13 +77,7 @@
 
 ## Proportional Symbol Map
 
-```{=html}
-<p align="center">
-```
-`<img src="images/viz5.png" width="900">`{=html}
-```{=html}
-</p>
-```
+<p align="center"> <img src="images/viz5.png" width="900"> </p>
 
 ------------------------------------------------------------------------
 
@@ -113,13 +85,7 @@
 
 ## Scatterplot
 
-```{=html}
-<p align="center">
-```
-`<img src="images/viz6.png" width="900">`{=html}
-```{=html}
-</p>
-```
+<p align="center"> <img src="images/viz6.png" width="900"> </p>
 
 ------------------------------------------------------------------------
 
@@ -127,13 +93,7 @@
 
 ## Bubble Chart
 
-```{=html}
-<p align="center">
-```
-`<img src="images/viz7.png" width="900">`{=html}
-```{=html}
-</p>
-```
+<p align="center"> <img src="images/viz7.png" width="900"> </p>
 
 ------------------------------------------------------------------------
 
